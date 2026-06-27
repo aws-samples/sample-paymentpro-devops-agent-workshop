@@ -1,0 +1,40 @@
+[project]
+name = "shared"
+version = "1.0.0"
+description = "Shared library for Payment Processing Services - common models, enums, and utilities"
+requires-python = ">=3.12"
+dependencies = [
+    "pydantic>=2.0,<3.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "ruff>=0.4.0",
+    "mypy>=1.0",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.coverage.run]
+source = ["shared"]
+omit = ["tests/*"]
+
+[tool.coverage.report]
+fail_under = 90

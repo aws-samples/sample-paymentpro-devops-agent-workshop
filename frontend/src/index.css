@@ -1,0 +1,207 @@
+:root {
+  --primary: #4f46e5;
+  --primary-hover: #4338ca;
+  --success: #10b981;
+  --danger: #ef4444;
+  --warning: #f59e0b;
+  --bg: #f8fafc;
+  --surface: #ffffff;
+  --text: #1e293b;
+  --text-muted: #64748b;
+  --border: #e2e8f0;
+  --radius: 8px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+}
+
+/* Nav */
+nav {
+  background: var(--surface);
+  padding: 0.75rem 2rem;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  gap: 1.5rem;
+  align-items: center;
+  box-shadow: var(--shadow);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+nav a {
+  color: var(--text-muted);
+  text-decoration: none;
+  font-weight: 500;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius);
+  transition: all 0.2s;
+  font-size: 0.9rem;
+}
+nav a:first-child { font-weight: 700; color: var(--primary); font-size: 1rem; }
+nav a:hover, nav a.active { color: var(--primary); background: #eef2ff; }
+
+/* Main */
+main { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+
+/* Typography */
+h1 { font-size: 1.75rem; font-weight: 700; margin-bottom: 0.5rem; }
+h2 { font-size: 1.25rem; font-weight: 600; margin: 1.5rem 0 1rem; color: var(--text); }
+h3 { font-size: 0.9rem; font-weight: 600; color: var(--text-muted); margin-bottom: 0.25rem; }
+
+/* Forms */
+.form-group { margin-bottom: 1rem; }
+.form-group label { display: block; font-weight: 500; margin-bottom: 0.4rem; font-size: 0.9rem; }
+input, select {
+  width: 100%;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 0.95rem;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  background: var(--surface);
+}
+input:focus, select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+/* Buttons */
+button {
+  padding: 0.7rem 1.25rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: all 0.2s;
+  background: var(--primary);
+  color: white;
+}
+button:hover { background: var(--primary-hover); box-shadow: var(--shadow); }
+button:disabled { opacity: 0.6; cursor: not-allowed; }
+button[type="submit"] { width: 100%; }
+
+.btn-secondary { background: #f1f5f9; color: var(--text); border: 1px solid var(--border); }
+.btn-secondary:hover { background: #e2e8f0; }
+.btn-small { padding: 0.4rem 0.8rem; font-size: 0.8rem; width: auto; }
+.btn-tiny { padding: 0.25rem 0.5rem; font-size: 0.75rem; width: auto; background: #f1f5f9; color: var(--text); }
+.btn-tiny:hover { background: #e2e8f0; }
+.btn-danger { background: #fef2f2; color: var(--danger); }
+.btn-danger:hover { background: #fee2e2; }
+.link-button { background: none; color: var(--primary); padding: 0; font-weight: 500; width: auto; }
+.link-button:hover { background: none; text-decoration: underline; }
+
+/* Cards */
+.card {
+  background: var(--surface);
+  padding: 1.25rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+.stat-card { text-align: center; }
+.stat-value { font-size: 1.75rem; font-weight: 700; color: var(--primary); margin-top: 0.25rem; }
+
+/* Result boxes */
+.result-box {
+  padding: 1rem;
+  border-radius: var(--radius);
+  margin: 1rem 0;
+}
+.result-box.success { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; }
+.result-box.error { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
+
+/* Warning box */
+.warning-box {
+  padding: 1rem;
+  border-radius: var(--radius);
+  margin: 1rem 0;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #92400e;
+}
+
+/* Status badges */
+.status-badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+.status-badge.success { background: #dcfce7; color: #166534; }
+.status-badge.failed { background: #fee2e2; color: #991b1b; }
+.status-badge.pending { background: #fef3c7; color: #92400e; }
+
+/* Transaction list */
+.transaction-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.transaction-item {
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+/* Rate bar */
+.rate-bar { display: flex; height: 32px; border-radius: var(--radius); overflow: hidden; }
+.rate-segment { display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 600; color: white; }
+.rate-segment.success { background: var(--success); }
+.rate-segment.failed { background: var(--danger); }
+.rate-segment.pending { background: var(--warning); }
+
+/* Tables */
+table { width: 100%; border-collapse: collapse; background: var(--surface); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
+th { background: #f1f5f9; font-weight: 600; text-align: left; padding: 0.6rem 1rem; border-bottom: 2px solid var(--border); font-size: 0.85rem; }
+td { padding: 0.6rem 1rem; border-bottom: 1px solid var(--border); }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: #f8fafc; }
+
+/* Code */
+code { background: #f1f5f9; padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.8rem; }
+
+/* Links */
+a { color: var(--primary); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* Responsive */
+@media (max-width: 768px) {
+  main { padding: 1rem; }
+  div[style*="grid-template-columns: 1fr 1fr"] { grid-template-columns: 1fr !important; }
+  div[style*="grid-template-columns: repeat(4"] { grid-template-columns: repeat(2, 1fr) !important; }
+}
+
+/* Info boxes */
+.info-box {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: var(--radius);
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  font-size: 0.9rem;
+  color: #1e40af;
+}
+.info-box p { margin-top: 0.5rem; color: #1e40af; }
+.info-box code { background: #dbeafe; color: #1e40af; }
+
+.info-text {
+  color: #64748b;
+  font-size: 0.9rem;
+  margin-bottom: 1.5rem;
+}
+
+/* Tooltips */
+.tooltip {
+  cursor: help;
+  font-size: 0.85rem;
+  opacity: 0.7;
+}
+.tooltip:hover { opacity: 1; }
