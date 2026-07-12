@@ -158,15 +158,18 @@ recover() {
         echo "  Rolling back to: $GOOD_TASK_DEF"
     else
         echo -e "${YELLOW}  No saved task def found. Using previous revision...${NC}"
-        # Find the last good revision (current - 1)
+        # Find the last good revision (current - 1). The task-def ARN looks like
+        #   arn:aws:ecs:<region>:<account>:task-definition/<family>:<revision>
+        # so we split the string after the "task-definition/" segment.
         CURRENT_TASK_DEF=$(aws ecs describe-services \
             --cluster "$CLUSTER" \
             --services "$SERVICE" \
             "${AWS_OPTS[@]}" \
             --query 'services[0].taskDefinition' \
             --output text)
-        FAMILY=$(echo "$CURRENT_TASK_DEF" | cut -d: -f1 | rev | cut -d/ -f1 | rev)
-        CURRENT_REV=$(echo "$CURRENT_TASK_DEF" | rev | cut -d: -f1 | rev)
+        FAMILY_AND_REV="${CURRENT_TASK_DEF##*/}"     # e.g. fraud-service:5
+        FAMILY="${FAMILY_AND_REV%:*}"                # fraud-service
+        CURRENT_REV="${FAMILY_AND_REV##*:}"          # 5
         GOOD_REV=$((CURRENT_REV - 1))
         GOOD_TASK_DEF="${FAMILY}:${GOOD_REV}"
         echo "  Using previous revision: $GOOD_TASK_DEF"
@@ -185,11 +188,6 @@ recover() {
     echo -e "  ${GREEN}* Rollback initiated. Service will stabilize in ~60 seconds.${NC}"
     echo ""
 
-    # Reset alarms (best-effort)
-    if [ -f "$PROJECT_ROOT/tools/reset_alarms.py" ]; then
-        echo "  Resetting alarms..."
-        python3 "$PROJECT_ROOT/tools/reset_alarms.py" || true
-    fi
 }
 
 # Main

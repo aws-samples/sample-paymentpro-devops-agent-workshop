@@ -40,13 +40,15 @@ echo "Profile: $AWS_PROFILE"
 echo "Command: $COMMAND"
 echo ""
 
-# --- Detect container runtime (Finch first, then Docker) ---
-if command -v finch &> /dev/null; then
-    export CDK_DOCKER=finch
-    echo "✓ Container runtime: finch"
+# --- Detect container runtime (respect CDK_DOCKER if set, else Docker first, then Finch) ---
+if [ -n "${CDK_DOCKER:-}" ]; then
+    echo "✓ Container runtime: $CDK_DOCKER (from environment)"
 elif command -v docker &> /dev/null; then
     export CDK_DOCKER=docker
     echo "✓ Container runtime: docker"
+elif command -v finch &> /dev/null; then
+    export CDK_DOCKER=finch
+    echo "✓ Container runtime: finch"
 else
     echo "✗ ERROR: Neither finch nor docker found. Please install one."
     exit 1

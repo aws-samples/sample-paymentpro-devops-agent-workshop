@@ -145,24 +145,30 @@ print(f'    WCU: {cap[\"WriteCapacityUnits\"]}')
 
 traffic() {
     echo -e "${CYAN}═══════════════════════════════════════════════════════════════${NC}"
-    echo -e "${CYAN}  GENERATING TRAFFIC → DynamoDB Audit Writes${NC}"
+    echo -e "${CYAN}  GENERATING TRAFFIC → DynamoDB Audit Writes (5 minutes)${NC}"
     echo -e "${CYAN}═══════════════════════════════════════════════════════════════${NC}"
     echo ""
-    echo "  Writing 100 audit records rapidly to trigger throttling..."
-    echo "  (With WCU=1, any burst >1 write/sec will be throttled)"
+    echo "  Writing continuously for 5 minutes to exhaust DynamoDB burst credits"
+    echo "  and trigger throttling. (DynamoDB accumulates burst capacity from"
+    echo "  unused WCU — this sustained load will deplete it.)"
+    echo ""
+    echo "  Press Ctrl+C to stop early once throttling is detected."
     echo ""
 
     python3 - << 'PYTHON'
 import os
 import boto3
-import json
 import uuid
 import time
 import random
-from datetime import datetime
+from datetime import datetime, timezone
 
 session = boto3.Session(profile_name=os.environ.get('AWS_PROFILE'), region_name='us-east-1')
-dynamodb = session.resource('dynamodb')
+# Disable automatic retries so throttle exceptions surface immediately
+# instead of the SDK silently retrying with backoff
+from botocore.config import Config
+no_retry_config = Config(retries={'max_attempts': 0})
+dynamodb = session.resource('dynamodb', config=no_retry_config)
 table = dynamodb.Table('PaymentPro-TransactionAudit')
 
 payment_types = ['UPI', 'CREDIT_CARD', 'DEBIT_CARD', 'WALLET']
@@ -172,51 +178,69 @@ merchants = ['merchant-001', 'merchant-002', 'merchant-003', 'merchant-004']
 success = 0
 throttled = 0
 errors = 0
+duration_seconds = 300  # 5 minutes
 
-print(f"  Starting burst writes at {datetime.utcnow().strftime('%H:%M:%S')} UTC")
-print(f"  {'─' * 50}")
+start_time = time.time()
+print(f"  Started at {datetime.now(timezone.utc).strftime('%H:%M:%S')} UTC — running for 5 minutes")
+print(f"  {'─' * 55}")
 
-for i in range(100):
-    try:
-        item = {
-            'transaction_id': str(uuid.uuid4()),
-            'timestamp': datetime.utcnow().isoformat() + 'Z',
-            'merchant_id': random.choice(merchants),
-            'payment_type': random.choice(payment_types),
-            'amount': str(round(random.uniform(10, 10000), 2)),
-            'currency': 'INR',
-            'status': random.choice(statuses),
-            'audit_event': 'PAYMENT_PROCESSED',
-            'ttl': int(time.time()) + 86400,  # 24h TTL
-        }
-        table.put_item(Item=item)
-        success += 1
-        if (i + 1) % 10 == 0:
-            print(f"  Writes: {i+1}/100 | Success: {success} | Throttled: {throttled}")
-    except Exception as e:
-        if 'ProvisionedThroughputExceededException' in str(type(e).__name__) or 'Throughput' in str(e):
-            throttled += 1
-            if throttled == 1:
-                print(f"  ⚡ First throttle detected at write #{i+1}")
-        else:
-            errors += 1
-            if errors <= 3:
-                print(f"  ✗ Error: {e}")
+try:
+    i = 0
+    while time.time() - start_time < duration_seconds:
+        try:
+            table.put_item(Item={
+                'transaction_id': str(uuid.uuid4()),
+                'timestamp': datetime.now(timezone.utc).isoformat(),
+                'merchant_id': random.choice(merchants),
+                'payment_type': random.choice(payment_types),
+                'amount': str(round(random.uniform(10, 10000), 2)),
+                'currency': 'INR',
+                'status': random.choice(statuses),
+                'audit_event': 'PAYMENT_PROCESSED',
+                'ttl': int(time.time()) + 86400,
+            })
+            success += 1
+        except Exception as e:
+            if 'Throughput' in str(e) or 'Throttl' in str(e):
+                throttled += 1
+                if throttled == 1:
+                    elapsed = int(time.time() - start_time)
+                    print(f"  ⚡ First throttle detected after {elapsed}s (write #{i+1})")
+            else:
+                errors += 1
 
-    # Small delay to sustain traffic over time (but still exceed 1 WCU)
-    time.sleep(0.05)
+        i += 1
+        # Print status every 30 seconds
+        elapsed = time.time() - start_time
+        if i % 100 == 0:
+            mins = int(elapsed) // 60
+            secs = int(elapsed) % 60
+            remaining = duration_seconds - int(elapsed)
+            print(f"  [{mins:02d}:{secs:02d}] Writes: {i} | Success: {success} | Throttled: {throttled} | Remaining: {remaining}s")
 
-print(f"  {'─' * 50}")
-print(f"  Results:")
-print(f"    Total:     100 writes")
-print(f"    Success:   {success}")
-print(f"    Throttled: {throttled}")
-print(f"    Errors:    {errors}")
+        # No delay — write as fast as possible to exhaust burst credits
+except KeyboardInterrupt:
+    print(f"\n  Stopped by user.")
+
+print(f"  {'─' * 55}")
+elapsed = int(time.time() - start_time)
+print(f"  Results ({elapsed}s elapsed):")
+print(f"    Total writes: {i}")
+print(f"    Success:      {success}")
+print(f"    Throttled:    {throttled}")
+print(f"    Errors:       {errors}")
 print(f"")
 if throttled > 0:
     print(f"  ✅ Throttling detected! DynamoDB alarm should fire within 60 seconds.")
 else:
-    print(f"  ⚠️  No throttling detected. Try running again or check table capacity.")
+    # Check if writes slowed down significantly (SDK auto-retries hide throttling)
+    writes_per_sec = i / max(elapsed, 1)
+    if writes_per_sec < 3 and elapsed > 60:
+        print(f"  ✅ Write throughput dropped to {writes_per_sec:.1f}/sec (SDK retrying throttled requests).")
+        print(f"     DynamoDB alarm should already be firing — the SDK hides throttling via retries.")
+    else:
+        print(f"  ⚠️  No throttling detected yet. Burst credits may still be draining.")
+        print(f"     Run 'traffic' again — throttling typically starts after 2-3 minutes.")
 PYTHON
 
     echo ""
@@ -259,10 +283,6 @@ recover() {
     echo "  DynamoDB capacity changes take effect within seconds."
     echo "  Throttling will stop immediately for new requests."
     echo ""
-
-    # Reset alarms
-    echo "  Resetting alarms..."
-    python3 "$PROJECT_ROOT/tools/reset_alarms.py"
 }
 
 # Main

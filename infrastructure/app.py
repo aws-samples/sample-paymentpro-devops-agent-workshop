@@ -63,17 +63,23 @@ simulator = SimulatorStack(
 # Stack 6: CloudWatch Dashboard, Alarms, SNS, Webhook Lambda
 monitoring = MonitoringStack(
     app, "PaymentProcessor-Monitoring",
+    alb_full_names=services.alb_full_names,
+    tg_full_names=services.tg_full_names,
     devops_agent_webhook_url=app.node.try_get_context("devops_agent_webhook_url") or "",
     devops_agent_webhook_secret=app.node.try_get_context("devops_agent_webhook_secret") or "",
     env=env,
 )
+monitoring.add_dependency(services)
 
 # Stack 7: DynamoDB table for transaction audit (DevOps Agent demo scenario 3)
+# Subscribes its throttle alarms to the same SNS topic as the other alarms so
+# the DevOps Agent webhook fires for Lab 3 the same way it does for Labs 1 & 2.
 dynamodb_table = DynamoDBStack(
     app, "PaymentProcessor-DynamoDB",
-    alarm_topic_arn=app.node.try_get_context("alarm_topic_arn") or "",
+    alarm_topic_arn=monitoring.alarm_topic.topic_arn,
     env=env,
 )
+dynamodb_table.add_dependency(monitoring)
 
 # Apply uniform tags to all stacks and resources
 for stack in [network, database, services, frontend, simulator, monitoring, dynamodb_table]:

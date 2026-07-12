@@ -192,6 +192,28 @@ class ServicesStack(Stack):
 
         # Outputs
         self.payment_alb_dns = payment_service.load_balancer.load_balancer_dns_name
+
+        # Expose each service's ALB by name (the CloudWatch LoadBalancer
+        # dimension value, e.g. "app/Paymen-Payme-.../abc") so MonitoringStack
+        # can build per-ALB widgets and alarms. Without this dimension the
+        # AWS/ApplicationELB metrics resolve to nothing.
+        self.alb_full_names = {
+            "fraud": fraud_service.load_balancer.load_balancer_full_name,
+            "routing": routing_service.load_balancer.load_balancer_full_name,
+            "merchant": merchant_service.load_balancer.load_balancer_full_name,
+            "analytics": analytics_service.load_balancer.load_balancer_full_name,
+            "payment": payment_service.load_balancer.load_balancer_full_name,
+        }
+        # HealthyHostCount and UnHealthyHostCount are only published when the
+        # metric is queried with BOTH LoadBalancer and TargetGroup dimensions.
+        # Track the target-group full name separately.
+        self.tg_full_names = {
+            "fraud": fraud_service.target_group.target_group_full_name,
+            "routing": routing_service.target_group.target_group_full_name,
+            "merchant": merchant_service.target_group.target_group_full_name,
+            "analytics": analytics_service.target_group.target_group_full_name,
+            "payment": payment_service.target_group.target_group_full_name,
+        }
         CfnOutput(self, "PaymentServiceUrl", value=self.payment_alb_dns)
         CfnOutput(self, "ClusterName", value=cluster.cluster_name)
 
@@ -261,6 +283,11 @@ class ServicesStack(Stack):
             public_load_balancer=public,
             assign_public_ip=False,
             health_check_grace_period=Duration.seconds(60),
+            circuit_breaker=ecs.DeploymentCircuitBreaker(
+                enable=True,
+                rollback=False,  # Don't auto-rollback — let the alarm fire
+            ),
+            min_healthy_percent=0,  # Allow old task to drain immediately
         )
 
         # Configure health check

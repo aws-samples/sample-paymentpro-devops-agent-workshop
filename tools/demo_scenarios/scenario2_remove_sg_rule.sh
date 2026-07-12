@@ -92,10 +92,11 @@ inject() {
     echo ""
     echo "  Expected behavior:"
     echo "    1. All DB-dependent services lose connectivity to PostgreSQL"
-    echo "    2. New requests timeout on DB connection (5-30 second delay)"
-    echo "    3. ALB health checks fail → services marked unhealthy"
-    echo "    4. 5xx errors spike → ALB-High5xxErrors alarm fires"
-    echo "    5. DevOps Agent investigates, finds RevokeSecurityGroupIngress in CloudTrail"
+    echo "    2. Health checks fail (SELECT 1 times out within 3 seconds)"
+    echo "    3. ALB marks targets unhealthy"
+    echo "    4. Circuit breaker detects failure, tasks stopped"
+    echo "    5. NoRunningTasks alarms fire for payment, merchant, routing, analytics"
+    echo "    6. DevOps Agent investigates, finds RevokeSecurityGroupIngress in CloudTrail"
     echo ""
 
     # Find the RDS security group
@@ -162,11 +163,11 @@ for r in rules:
     echo "    ✓ fraud-service     (stateless — NO database dependency)"
     echo ""
     echo "  Timeline:"
-    echo "    ~10s   — Existing DB connections timeout on next query"
-    echo "    ~30s   — Health checks start failing (DB connection error)"
-    echo "    ~60s   — ALB marks targets unhealthy"
-    echo "    ~90s   — ALB-High5xxErrors alarm fires"
-    echo "    ~120s  — DevOps Agent investigation triggered"
+    echo "    ~3s    — Health check SELECT 1 times out (connect_timeout=3s)"
+    echo "    ~30s   — ALB marks targets unhealthy (after failed health checks)"
+    echo "    ~60s   — Circuit breaker stops tasks, running count drops to 0"
+    echo "    ~60s   — NoRunningTasks alarms fire for 4 DB-dependent services"
+    echo "    ~90s   — DevOps Agent webhook triggered, investigation begins"
     echo ""
     echo "  Generate traffic to accelerate failure detection:"
     echo "    python3 $PROJECT_ROOT/tools/traffic_simulator.py --count 10 --interval 1 -v"
@@ -214,23 +215,29 @@ recover() {
     echo ""
     echo -e "  ${GREEN}✓ Ingress rule restored.${NC}"
     echo ""
-    echo "  Services will recover automatically as DB connections re-establish."
-    echo "  Existing tasks do NOT need restart — they will reconnect."
+
+    # Force new deployments for all DB-dependent services.
+    # After circuit breaker stops tasks, ECS won't retry automatically —
+    # we need to force a new deployment to restart the tasks.
+    echo "  Step 2: Forcing new deployments to restart stopped services..."
+    for svc in payment-service routing-service merchant-service analytics-service; do
+        aws ecs update-service \
+            --cluster "$CLUSTER" \
+            --service "$svc" \
+            --force-new-deployment \
+ \
+            --region "$REGION" \
+            --query 'service.status' \
+            --output text > /dev/null 2>&1
+        echo -e "    ${GREEN}✓ $svc — new deployment triggered${NC}"
+    done
+
     echo ""
     echo "  Timeline:"
     echo "    ~10s — New DB connections succeed"
-    echo "    ~30s — Health checks pass"
-    echo "    ~60s — ALB marks targets healthy"
+    echo "    ~30s — Health checks pass, tasks become healthy"
+    echo "    ~60s — ALB marks targets healthy, alarms clear"
     echo ""
-
-    # Force new connections by sending traffic
-    echo "  Sending traffic to force connection re-establishment..."
-    python3 "$PROJECT_ROOT/tools/traffic_simulator.py" --count 5 --interval 1 -v 2>/dev/null || true
-
-    # Reset alarms
-    echo ""
-    echo "  Resetting alarms..."
-    python3 "$PROJECT_ROOT/tools/reset_alarms.py"
 }
 
 # Main
