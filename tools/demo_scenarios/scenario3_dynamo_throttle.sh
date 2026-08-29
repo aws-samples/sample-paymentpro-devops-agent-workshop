@@ -256,13 +256,25 @@ recover() {
     echo ""
 
     echo "  Restoring capacity to WCU=$NORMAL_WCU, RCU=$NORMAL_RCU..."
-    aws dynamodb update-table \
+    # Check current capacity first so recover is idempotent: DynamoDB rejects an
+    # update-table that does not change the throughput with a ValidationException,
+    # which would abort the script under 'set -e' if capacity is already restored.
+    CURRENT_WCU=$(aws dynamodb describe-table \
         --table-name "$TABLE_NAME" \
-        --provisioned-throughput "ReadCapacityUnits=$NORMAL_RCU,WriteCapacityUnits=$NORMAL_WCU" \
- \
         --region "$REGION" \
-        --query 'TableDescription.TableStatus' \
-        --output text > /dev/null
+        --query 'Table.ProvisionedThroughput.WriteCapacityUnits' \
+        --output text 2>/dev/null || echo "0")
+    if [ "$CURRENT_WCU" == "$NORMAL_WCU" ]; then
+        echo "  (Table already at WCU=$NORMAL_WCU — nothing to restore.)"
+    else
+        aws dynamodb update-table \
+            --table-name "$TABLE_NAME" \
+            --provisioned-throughput "ReadCapacityUnits=$NORMAL_RCU,WriteCapacityUnits=$NORMAL_WCU" \
+ \
+            --region "$REGION" \
+            --query 'TableDescription.TableStatus' \
+            --output text > /dev/null
+    fi
 
     echo "  Restoring GSI capacity..."
     aws dynamodb update-table \
