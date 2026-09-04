@@ -65,11 +65,13 @@ monitoring = MonitoringStack(
     app, "PaymentProcessor-Monitoring",
     alb_full_names=services.alb_full_names,
     tg_full_names=services.tg_full_names,
+    db_instance_identifier=database.db_instance.instance_identifier,
     devops_agent_webhook_url=app.node.try_get_context("devops_agent_webhook_url") or "",
     devops_agent_webhook_secret=app.node.try_get_context("devops_agent_webhook_secret") or "",
     env=env,
 )
 monitoring.add_dependency(services)
+monitoring.add_dependency(database)
 
 # Stack 7: DynamoDB table for transaction audit (DevOps Agent demo scenario 3)
 # Subscribes its throttle alarms to the same SNS topic as the other alarms so

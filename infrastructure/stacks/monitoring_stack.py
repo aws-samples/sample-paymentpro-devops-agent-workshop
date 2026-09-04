@@ -36,6 +36,7 @@ class MonitoringStack(Stack):
         construct_id: str,
         alb_full_names: dict[str, str] | None = None,
         tg_full_names: dict[str, str] | None = None,
+        db_instance_identifier: str | None = None,
         devops_agent_webhook_url: str = "",
         devops_agent_webhook_secret: str = "",
         **kwargs,
@@ -341,7 +342,7 @@ class MonitoringStack(Stack):
         # RDS Metrics
         dashboard.add_widgets(
             cw.GraphWidget(title="RDS CPU", left=[cw.Metric(namespace="AWS/RDS", metric_name="CPUUtilization", statistic="Average", period=Duration.minutes(1))], width=8, height=6),
-            cw.GraphWidget(title="RDS Connections", left=[cw.Metric(namespace="AWS/RDS", metric_name="DatabaseConnections", statistic="Maximum", period=Duration.minutes(1))], width=8, height=6),
+            cw.GraphWidget(title="RDS Connections", left=[cw.Metric(namespace="AWS/RDS", metric_name="DatabaseConnections", dimensions_map=({"DBInstanceIdentifier": db_instance_identifier} if db_instance_identifier else {}), statistic="Maximum", period=Duration.minutes(1))], width=8, height=6),
             cw.GraphWidget(title="RDS IOPS", left=[cw.Metric(namespace="AWS/RDS", metric_name="ReadIOPS", statistic="Average", period=Duration.minutes(1)), cw.Metric(namespace="AWS/RDS", metric_name="WriteIOPS", statistic="Average", period=Duration.minutes(1))], width=8, height=6),
         )
 
@@ -456,7 +457,7 @@ class MonitoringStack(Stack):
         rds_cpu.add_alarm_action(cw_actions.SnsAction(alarm_topic))
         alarms_by_group["RDS"].append(rds_cpu)
 
-        rds_conn = cw.Alarm(self, "RdsConnectionsAlarm", alarm_name="PaymentPro-RDS-HighConnections", alarm_description="RDS connections > 30", metric=cw.Metric(namespace="AWS/RDS", metric_name="DatabaseConnections", statistic="Maximum", period=Duration.minutes(1)), threshold=30, evaluation_periods=1, comparison_operator=cw.ComparisonOperator.GREATER_THAN_THRESHOLD, treat_missing_data=cw.TreatMissingData.NOT_BREACHING)
+        rds_conn = cw.Alarm(self, "RdsConnectionsAlarm", alarm_name="PaymentPro-RDS-HighConnections", alarm_description="RDS connections > 30", metric=cw.Metric(namespace="AWS/RDS", metric_name="DatabaseConnections", dimensions_map=({"DBInstanceIdentifier": db_instance_identifier} if db_instance_identifier else {}), statistic="Maximum", period=Duration.minutes(1)), threshold=30, evaluation_periods=1, comparison_operator=cw.ComparisonOperator.GREATER_THAN_THRESHOLD, treat_missing_data=cw.TreatMissingData.NOT_BREACHING)
         rds_conn.add_alarm_action(cw_actions.SnsAction(alarm_topic))
         alarms_by_group["RDS"].append(rds_conn)
 
