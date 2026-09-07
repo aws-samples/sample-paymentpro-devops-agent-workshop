@@ -21,7 +21,7 @@ set -euo pipefail
 # =============================================================================
 
 
-REGION="us-east-1"
+REGION="${AWS_DEFAULT_REGION:-us-east-1}"
 CLUSTER="payment-processor"
 PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 
@@ -145,7 +145,8 @@ for r in rules:
         --port 5432 \
         --cidr "$VPC_CIDR" \
  \
-        --region "$REGION"
+        --region "$REGION" \
+        --output text > /dev/null
 
     echo ""
     echo -e "${RED}═══════════════════════════════════════════════════════════════${NC}"
@@ -172,8 +173,9 @@ for r in rules:
     echo "  Generate traffic to accelerate failure detection:"
     echo "    python3 $PROJECT_ROOT/tools/traffic_simulator.py --count 10 --interval 1 -v"
     echo ""
-    echo "  Monitor:"
-    echo "    aws logs tail /ecs/payment --follow"
+    echo "  Monitor (service log groups are named by the CDK deployment; list them first):"
+    echo "    aws logs describe-log-groups --query \"logGroups[?contains(logGroupName, 'payment')].logGroupName\" --output text"
+    echo "    aws logs tail <log-group-name-from-above> --follow"
     echo ""
     echo "  Recover:"
     echo "    $0 recover"
@@ -206,21 +208,32 @@ recover() {
 
     aws ec2 authorize-security-group-ingress \
         --group-id "$SG_ID" \
-        --protocol tcp \
-        --port 5432 \
-        --cidr "$VPC_CIDR" \
+        --ip-permissions "IpProtocol=tcp,FromPort=5432,ToPort=5432,IpRanges=[{CidrIp=$VPC_CIDR,Description='Allow PostgreSQL from VPC'}]" \
  \
-        --region "$REGION" 2>/dev/null || echo "  (Rule may already exist)"
+        --region "$REGION" \
+        --output text > /dev/null 2>&1 || echo "  (Rule may already exist)"
 
     echo ""
     echo -e "  ${GREEN}✓ Ingress rule restored.${NC}"
     echo ""
 
-    # Force new deployments for all DB-dependent services.
-    # After circuit breaker stops tasks, ECS won't retry automatically —
-    # we need to force a new deployment to restart the tasks.
-    echo "  Step 2: Forcing new deployments to restart stopped services..."
+    # Force new deployments only for services that are not already healthy.
+    # After the circuit breaker stops tasks, ECS won't retry automatically, so a
+    # new deployment is needed to bring them back. But if a service is already at
+    # its desired count (e.g. recover run on a healthy app, or run twice), forcing
+    # a deployment is unnecessary churn — so we check first and skip healthy ones.
+    echo "  Step 2: Restarting any stopped DB-dependent services..."
     for svc in payment-service routing-service merchant-service analytics-service; do
+        read -r RUNNING DESIRED < <(aws ecs describe-services \
+            --cluster "$CLUSTER" \
+            --services "$svc" \
+            --region "$REGION" \
+            --query 'services[0].[runningCount,desiredCount]' \
+            --output text 2>/dev/null || echo "0 1")
+        if [ "${RUNNING:-0}" -ge "${DESIRED:-1}" ] && [ "${DESIRED:-1}" -gt 0 ]; then
+            echo -e "    ${GREEN}✓ $svc — already healthy ($RUNNING/$DESIRED), skipping${NC}"
+            continue
+        fi
         aws ecs update-service \
             --cluster "$CLUSTER" \
             --service "$svc" \

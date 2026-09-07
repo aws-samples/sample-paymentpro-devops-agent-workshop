@@ -153,6 +153,30 @@ recover() {
     echo -e "${GREEN}===============================================================${NC}"
     echo ""
 
+    # State pre-check: only roll back if fraud-service is actually running the
+    # broken revision. This makes recover a safe no-op on an already-healthy
+    # service (e.g. run twice, or run when no fault was injected), instead of
+    # blindly rolling back to a "previous" revision that may itself be stale.
+    CURRENT_TASK_DEF=$(aws ecs describe-services \
+        --cluster "$CLUSTER" \
+        --services "$SERVICE" \
+        "${AWS_OPTS[@]}" \
+        --query 'services[0].taskDefinition' \
+        --output text 2>/dev/null || echo "")
+
+    if [ -n "$CURRENT_TASK_DEF" ]; then
+        CURRENT_CMD=$(aws ecs describe-task-definition \
+            --task-definition "$CURRENT_TASK_DEF" \
+            "${AWS_OPTS[@]}" \
+            --query 'taskDefinition.containerDefinitions[0].command' \
+            --output text 2>/dev/null || echo "")
+        if [[ "$CURRENT_CMD" != *nonexistent_payment_module* ]]; then
+            echo -e "  ${GREEN}* fraud-service is not on the broken revision — nothing to recover.${NC}"
+            echo ""
+            return 0
+        fi
+    fi
+
     if [ -f /tmp/fraud_good_taskdef.txt ]; then
         GOOD_TASK_DEF=$(cat /tmp/fraud_good_taskdef.txt)
         echo "  Rolling back to: $GOOD_TASK_DEF"
@@ -161,12 +185,6 @@ recover() {
         # Find the last good revision (current - 1). The task-def ARN looks like
         #   arn:aws:ecs:<region>:<account>:task-definition/<family>:<revision>
         # so we split the string after the "task-definition/" segment.
-        CURRENT_TASK_DEF=$(aws ecs describe-services \
-            --cluster "$CLUSTER" \
-            --services "$SERVICE" \
-            "${AWS_OPTS[@]}" \
-            --query 'services[0].taskDefinition' \
-            --output text)
         FAMILY_AND_REV="${CURRENT_TASK_DEF##*/}"     # e.g. fraud-service:5
         FAMILY="${FAMILY_AND_REV%:*}"                # fraud-service
         CURRENT_REV="${FAMILY_AND_REV##*:}"          # 5
