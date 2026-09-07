@@ -22,7 +22,7 @@ set -euo pipefail
 # =============================================================================
 
 
-REGION="us-east-1"
+REGION="${AWS_DEFAULT_REGION:-us-east-1}"
 TABLE_NAME="PaymentPro-TransactionAudit"
 PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 
