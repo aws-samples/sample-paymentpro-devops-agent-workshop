@@ -36,6 +36,8 @@ export const api = {
   createPayment: (data: object) => request<object>('/payments', { method: 'POST', body: JSON.stringify(data) }),
   getTransaction: (id: string) => request<object>(`/payments/${id}`),
   listTransactions: (params?: string) => request<object>(`/payments${params ? `?${params}` : ''}`),
+  refundTransaction: (id: string, amount: string, reason?: string) =>
+    request<object>(`/payments/${id}/refund`, { method: 'POST', body: JSON.stringify({ amount, reason }) }),
 
   // Merchants
   register: (data: object) => request<object>('/merchants/register', { method: 'POST', body: JSON.stringify(data) }),

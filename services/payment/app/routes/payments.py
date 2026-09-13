@@ -9,10 +9,17 @@ from app.models.schemas import (
     PaginatedTransactions,
     PaymentRequest,
     PaymentResponse,
+    RefundRequest,
+    RefundResponse,
     TransactionDetail,
     TransactionFilters,
 )
-from app.services.payment_processor import get_transaction, list_transactions, process_payment
+from app.services.payment_processor import (
+    get_transaction,
+    list_transactions,
+    process_payment,
+    process_refund,
+)
 
 logger = structlog.get_logger()
 
@@ -34,6 +41,20 @@ async def create_payment_endpoint(
     logger.info(
         "payment_result",
         transaction_id=result.transaction_id,
+        status=result.status,
+    )
+    return result
+
+
+@router.post("/{transaction_id}/refund", response_model=RefundResponse, status_code=201)
+async def refund_payment_endpoint(
+    transaction_id: str, request: RefundRequest, db: AsyncSession = Depends(get_db)
+) -> RefundResponse:
+    """Refund a settled transaction (merchant-initiated)."""
+    result = await process_refund(transaction_id, request, db)
+    logger.info(
+        "refund_endpoint",
+        transaction_id=transaction_id,
         status=result.status,
     )
     return result

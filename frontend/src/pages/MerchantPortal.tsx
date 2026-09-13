@@ -116,6 +116,18 @@ export function MerchantPortal() {
     setTimeout(() => setCopiedKey(''), 2000);
   };
 
+  const handleRefund = async (txn: any) => {
+    setError('');
+    try {
+      await api.refundTransaction(txn.id, txn.amount, 'Merchant-initiated refund');
+      setSuccess('Refund processed!');
+      setTimeout(() => setSuccess(''), 3000);
+      loadTransactions();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Refund failed');
+    }
+  };
+
   const handleLogout = () => {
     if (auth.sessionId) api.logout(auth.sessionId).catch(() => {});
     authLogout();
@@ -224,7 +236,7 @@ export function MerchantPortal() {
             </div>
             {transactions.length === 0 ? <p style={{ color: '#64748b' }}>No transactions yet.</p> : (
               <table>
-                <thead><tr><th>Status</th><th>Amount</th><th>Type</th><th>Route</th><th>Time</th></tr></thead>
+                <thead><tr><th>Status</th><th>Amount</th><th>Type</th><th>Route</th><th>Time</th><th>Actions</th></tr></thead>
                 <tbody>
                   {transactions.map((txn: any) => (
                     <tr key={txn.id}>
@@ -233,6 +245,12 @@ export function MerchantPortal() {
                       <td>{txn.payment_type}</td>
                       <td><code>{txn.route_target || '—'}</code></td>
                       <td style={{ fontSize: '0.85rem', color: '#64748b' }}>{new Date(txn.created_at).toLocaleString()}</td>
+                      <td>
+                        {txn.status === 'SUCCESS' && (
+                          <button onClick={() => handleRefund(txn)} className="btn-tiny btn-danger">↩ Refund</button>
+                        )}
+                        {txn.status === 'REFUNDED' && <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Refunded</span>}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

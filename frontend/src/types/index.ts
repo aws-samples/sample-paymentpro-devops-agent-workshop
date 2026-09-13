@@ -1,7 +1,7 @@
 /** Shared TypeScript types for the frontend. */
 
 export type PaymentType = 'UPI' | 'CREDIT_CARD' | 'DEBIT_CARD' | 'WALLET';
-export type TransactionStatus = 'PENDING' | 'SUCCESS' | 'FAILED';
+export type TransactionStatus = 'PENDING' | 'SUCCESS' | 'FAILED' | 'REFUNDED';
 
 export interface PaymentRequest {
   payment_type: PaymentType;

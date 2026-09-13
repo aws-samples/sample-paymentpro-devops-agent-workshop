@@ -61,3 +61,18 @@ async def call_merchant_validate_key(api_key: str) -> dict[str, Any]:
         )
         response.raise_for_status()
         return response.json()
+
+
+async def call_merchant_ownership(api_key: str) -> dict[str, Any]:
+    """Resolve the merchant that owns an API key, for refund authorization.
+
+    Returns dict with 'valid' and 'merchant_id' keys.
+    """
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        response = await client.post(
+            f"{settings.merchant_service_url}/api/v1/merchants/validate-key",
+            params={"api_key": api_key},
+            headers={"X-Service-Key": settings.service_secret},
+        )
+        response.raise_for_status()
+        return response.json()

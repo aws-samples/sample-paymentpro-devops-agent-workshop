@@ -56,6 +56,14 @@ def create_app() -> FastAPI:
                 "ALTER TABLE transactions "
                 "ADD COLUMN IF NOT EXISTS failure_reason VARCHAR(500)"
             ))
+            await conn.execute(text(
+                "ALTER TABLE transactions "
+                "ADD COLUMN IF NOT EXISTS refunded_amount NUMERIC(12, 2)"
+            ))
+            await conn.execute(text(
+                "ALTER TABLE transactions "
+                "ADD COLUMN IF NOT EXISTS refund_reason VARCHAR(500)"
+            ))
         yield
 
     application = FastAPI(

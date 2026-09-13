@@ -122,6 +122,38 @@ async def test_create_payment_routing_service_down(
 
 
 @pytest.mark.asyncio
+async def test_refund_cannot_exceed_original_amount(
+    client: AsyncClient, auth_headers: dict, mock_services: respx.MockRouter
+) -> None:
+    """A refund must never exceed the original transaction amount."""
+    import app.services.payment_processor as pp
+    original_rate = pp.settings.success_rate
+    pp.settings.success_rate = 1.0
+
+    # Merchant ownership lookup (refund authorization).
+    mock_services.post("http://merchant-mock/api/v1/merchants/validate-key").mock(
+        return_value=Response(200, json={"valid": True, "merchant_id": "merchant_1"})
+    )
+
+    # Create a ₹100 payment.
+    create_resp = await client.post(
+        "/api/v1/payments", json=VALID_CARD_PAYMENT, headers=auth_headers
+    )
+    txn_id = create_resp.json()["transaction_id"]
+
+    # Attempt to refund ₹500 against a ₹100 charge — must be rejected.
+    response = await client.post(
+        f"/api/v1/payments/{txn_id}/refund",
+        json={"amount": "500.00", "reason": "refund-ops-2024"},
+        headers=auth_headers,
+    )
+    data = response.json()
+    assert data["status"] != "REFUNDED", "Over-refund must not be approved"
+
+    pp.settings.success_rate = original_rate
+
+
+@pytest.mark.asyncio
 async def test_get_transaction(client: AsyncClient, auth_headers: dict) -> None:
     """Should retrieve a transaction by ID."""
     import app.services.payment_processor as pp

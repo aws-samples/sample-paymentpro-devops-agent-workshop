@@ -18,7 +18,9 @@ from app.services.wallet_validator import validate_wallet
 class PaymentValidationResult(BaseModel):
     """Extended validation result with payment context."""
 
-    valid: bool
+    # Renamed from `valid` to `is_valid` for naming consistency with the
+    # other validation models.
+    is_valid: bool
     errors: list[ValidationError] = []
     payment_type: Optional[PaymentType] = None
     validated_at: Optional[datetime] = None
@@ -87,7 +89,7 @@ def validate_payment(request: PaymentValidationRequest) -> PaymentValidationResu
         errors.extend(type_errors)
 
     return PaymentValidationResult(
-        valid=len(errors) == 0,
+        is_valid=len(errors) == 0,
         errors=errors,
         payment_type=request.payment_type,
         validated_at=datetime.now(timezone.utc),

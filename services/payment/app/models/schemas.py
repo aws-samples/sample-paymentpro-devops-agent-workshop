@@ -52,6 +52,25 @@ class TransactionDetail(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class RefundRequest(BaseModel):
+    """Merchant-initiated refund request for a settled transaction."""
+
+    amount: Decimal = Field(gt=0)
+    reason: Optional[str] = None
+    # API key of the merchant that owns the transaction (used for the
+    # ownership lookup against the Merchant Service).
+    api_key: Optional[str] = None
+
+
+class RefundResponse(BaseModel):
+    """Refund processing response."""
+
+    transaction_id: str
+    status: str
+    refunded_amount: Decimal
+    message: str
+
+
 class TransactionFilters(BaseModel):
     """Query filters for listing transactions."""
 

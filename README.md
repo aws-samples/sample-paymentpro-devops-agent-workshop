@@ -1,3 +1,15 @@
+> **This branch is a training artifact. Do not deploy it or use it as reference code.**
+>
+> `feature/merchant-refunds` exists for Lab 4 of the AWS DevOps Agent workshop, where
+> participants ask the agent to review a proposed change before release. The branch adds
+> a merchant-refund feature and deliberately contains several defects a release review
+> should catch: security, cross-service compatibility, access-control, and correctness
+> issues. If deployed, the application does not process payments correctly. The defects
+> are not listed here because finding them is the exercise.
+>
+> The working application is on the `main` branch. `AGENTS.md` on this branch holds the
+> engineering standards the review is graded against.
+
 # sample-paymentpro-devops-agent-workshop
 
 Sample multi-service payment-processing app on AWS used to demonstrate AWS DevOps Agent incident detection via fault injection.

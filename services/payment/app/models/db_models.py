@@ -24,6 +24,9 @@ class TransactionDB(Base):
     status: Mapped[str] = mapped_column(String(20), default="PENDING")
     route_target: Mapped[str | None] = mapped_column(String(100), nullable=True)
     failure_reason: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    # Refund tracking (added for the merchant refunds feature).
+    refunded_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    refund_reason: Mapped[str | None] = mapped_column(String(500), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )

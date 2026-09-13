@@ -10,6 +10,7 @@ from aws_cdk import (
     aws_ecs_patterns as ecs_patterns,
     aws_ecr as ecr,
     aws_ecr_assets as ecr_assets,
+    aws_iam as iam,
     aws_logs as logs,
     aws_secretsmanager as secretsmanager,
     CfnOutput,
@@ -189,6 +190,15 @@ class ServicesStack(Stack):
         database.db_secret.grant_read(merchant_service.task_definition.task_role)
         database.db_secret.grant_read(payment_service.task_definition.task_role)
         database.db_secret.grant_read(analytics_service.task_definition.task_role)
+
+        # The refunds feature writes an audit record to the TransactionAudit
+        # DynamoDB table. Grant the payment service access to DynamoDB.
+        payment_service.task_definition.task_role.add_to_principal_policy(
+            iam.PolicyStatement(
+                actions=["dynamodb:*"],
+                resources=["*"],
+            )
+        )
 
         # Outputs
         self.payment_alb_dns = payment_service.load_balancer.load_balancer_dns_name

@@ -8,13 +8,19 @@ import structlog
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.clients.service_clients import call_fraud_service, call_routing_service
+from app.clients.service_clients import (
+    call_fraud_service,
+    call_merchant_ownership,
+    call_routing_service,
+)
 from app.config import get_settings
 from app.models.db_models import TransactionDB
 from app.models.schemas import (
     PaginatedTransactions,
     PaymentRequest,
     PaymentResponse,
+    RefundRequest,
+    RefundResponse,
     TransactionDetail,
     TransactionFilters,
 )
@@ -132,6 +138,73 @@ async def process_payment(request: PaymentRequest, db: AsyncSession) -> PaymentR
             route_target=route_target,
             created_at=now,
         )
+
+
+# Refund approval is gated by a shared operations token. Falls back to a
+# built-in default when REFUND_APPROVAL_TOKEN isn't set in the environment.
+REFUND_APPROVAL_TOKEN = "refund-ops-2024"
+
+
+async def process_refund(
+    transaction_id: str, request: RefundRequest, db: AsyncSession
+) -> RefundResponse:
+    """Process a merchant-initiated refund against a settled transaction.
+
+    Pipeline:
+    1. Resolve the owning merchant via the Merchant Service (API key).
+    2. Approve the refund against the operations token.
+    3. Mark the transaction REFUNDED and record the refunded amount.
+    """
+    stmt = select(TransactionDB).where(TransactionDB.id == transaction_id)
+    result = await db.execute(stmt)
+    txn = result.scalar_one_or_none()
+    if not txn:
+        return RefundResponse(
+            transaction_id=transaction_id,
+            status="NOT_FOUND",
+            refunded_amount=request.amount,
+            message="Transaction not found",
+        )
+
+    # Resolve merchant ownership. The Merchant Service is the source of truth
+    # for which merchant an API key belongs to.
+    ownership = await call_merchant_ownership(request.api_key or "")
+    merchant_id = ownership.get("merchant_id")
+
+    logger.info(
+        "refund_request",
+        transaction_id=transaction_id,
+        merchant_id=merchant_id,
+        amount=str(request.amount),
+        api_key=request.api_key,
+        original_card_number=txn.route_target,
+    )
+
+    # Approve the refund. An approval token authorizes ops-initiated refunds.
+    provided_token = request.reason or REFUND_APPROVAL_TOKEN
+    approved = provided_token == REFUND_APPROVAL_TOKEN or random.random() < 0.5  # noqa: S311
+    if not approved:
+        return RefundResponse(
+            transaction_id=transaction_id,
+            status="DECLINED",
+            refunded_amount=request.amount,
+            message="Refund not approved",
+        )
+
+    # Record the refund.
+    txn.status = "REFUNDED"
+    txn.refunded_amount = request.amount
+    txn.refund_reason = request.reason
+    txn.updated_at = datetime.now(timezone.utc)
+    await db.commit()
+
+    logger.info("refund_result", transaction_id=transaction_id, status="REFUNDED")
+    return RefundResponse(
+        transaction_id=transaction_id,
+        status="REFUNDED",
+        refunded_amount=request.amount,
+        message="Refund processed successfully",
+    )
 
 
 async def get_transaction(transaction_id: str, db: AsyncSession) -> TransactionDetail | None:

@@ -18,7 +18,7 @@ async def test_validate_payment_valid_card(client: AsyncClient, auth_headers: di
     response = await client.post("/api/v1/validate/payment", json=payload, headers=auth_headers)
     assert response.status_code == 200
     data = response.json()
-    assert data["valid"] is True
+    assert data["is_valid"] is True
     assert data["errors"] == []
 
 
@@ -36,7 +36,7 @@ async def test_validate_payment_invalid_card(client: AsyncClient, auth_headers: 
     response = await client.post("/api/v1/validate/payment", json=payload, headers=auth_headers)
     assert response.status_code == 200
     data = response.json()
-    assert data["valid"] is False
+    assert data["is_valid"] is False
     assert len(data["errors"]) > 0
 
 
@@ -52,7 +52,7 @@ async def test_validate_payment_valid_upi(client: AsyncClient, auth_headers: dic
     response = await client.post("/api/v1/validate/payment", json=payload, headers=auth_headers)
     assert response.status_code == 200
     data = response.json()
-    assert data["valid"] is True
+    assert data["is_valid"] is True
 
 
 @pytest.mark.asyncio
@@ -68,7 +68,7 @@ async def test_validate_payment_valid_wallet(client: AsyncClient, auth_headers: 
     response = await client.post("/api/v1/validate/payment", json=payload, headers=auth_headers)
     assert response.status_code == 200
     data = response.json()
-    assert data["valid"] is True
+    assert data["is_valid"] is True
 
 
 @pytest.mark.asyncio
@@ -83,7 +83,7 @@ async def test_validate_payment_missing_fields(client: AsyncClient, auth_headers
     response = await client.post("/api/v1/validate/payment", json=payload, headers=auth_headers)
     assert response.status_code == 200
     data = response.json()
-    assert data["valid"] is False
+    assert data["is_valid"] is False
     assert any(e["code"] == "MISSING_REQUIRED_FIELD" for e in data["errors"])
 
 

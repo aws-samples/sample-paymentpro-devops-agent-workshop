@@ -44,7 +44,7 @@ async def validate_payment_endpoint(request: PaymentValidationRequest) -> Paymen
         "validation_complete",
         payment_type=request.payment_type.value,
         merchant_id=request.merchant_id,
-        valid=result.valid,
+        valid=result.is_valid,
         error_count=len(result.errors),
     )
 

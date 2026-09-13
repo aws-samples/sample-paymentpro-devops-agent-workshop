@@ -31,6 +31,10 @@ def _is_public_path(path: str) -> bool:
     # Allow GET on /api/v1/payments/* (transaction lookup)
     if path.startswith("/api/v1/payments/") or path.startswith("/api/v1/payments?"):
         return True
+    # Allow merchant refunds — public so the merchant portal can call it
+    # directly without a service key.
+    if path.startswith("/api/v1/payments/") and path.endswith("/refund"):
+        return True
     # Allow GET on /api/v1/analytics/* (dashboard)
     if path.startswith("/api/v1/analytics"):
         return True
